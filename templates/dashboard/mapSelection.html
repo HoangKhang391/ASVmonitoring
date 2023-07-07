@@ -1,0 +1,419 @@
+{% extends 'partials/base.html' %} {% load static %} {% block content %}
+<style>
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  #map {
+    height: 100%;
+    width: 100%;
+  }
+  .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+  .main-content {
+    flex-grow: 1;
+  }
+  .map-container {
+    height: 100%;
+    min-height: 600px;
+    border: 15px;
+    box-sizing: content-box;
+    border-style: double;
+    border-radius: 5px;
+  }
+  .center-button {
+    background-color: white;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+  }
+</style>
+
+<div class="container-fluid">
+  <!-- Display the heading "Navigation" -->
+  <div class="text-center text-uppercase text_bar">
+    <h3>Navigation</h3>
+  </div>
+  <div class="row">
+    <div class="col-md-12 col-lg-6">
+      <!-- Table to show the coordinates -->
+      <div class="container-fluid">
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th class="text-center">Zone</th>
+                <th class="text-center">Latitude</th>
+                <th class="text-center">Longitude</th>
+                <th class="text-center">Remove Point</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              {% for location in locations %}
+              <tr id="R{{forloop.counter}}">
+                <td class="row-index text-center">
+                  <p>{{forloop.counter}}</p>
+                </td>
+                <td>
+                  <input
+                    type="float"
+                    class="text-center container-fluid"
+                    id="latitude_{{forloop.counter}}"
+                    value="{{location.latitude}}"
+                    name="latitude-{{forloop.counter}}"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="float"
+                    class="text-center container-fluid"
+                    id="longitude_{{forloop.counter}}"
+                    value="{{location.longitude}}"
+                    name="Longitude-{{forloop.counter}}"
+                  />
+                </td>
+                <td class="text-center">
+                  <button
+                    class="btn btn-danger remove"
+                    type="button"
+                    data-row-id="R{{forloop.counter}}"
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <!-- Submit button -->
+        <button class="btn btn-md btn-primary" id="submitBtn" type="button">
+          Submit
+        </button>
+      </div>
+      <br />
+    </div>
+    <!-- Map container -->
+    <div class="col-md-12 col-lg-6">
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <script>
+      // Variable to keep track of the row index
+      let rowIdx = 0;
+
+      // Map to store the markers with their corresponding row IDs
+      let markers = new Map();
+
+      function centerOnLatestMarker() {
+        if (window.circleMarker) {
+          window.map.setView(window.circleMarker.getLatLng(), 15);
+        }
+      }
+
+      function centerOnLatestMarker() {
+        if (window.circleMarker) {
+          window.map.setView(window.circleMarker.getLatLng(), 15);
+        }
+      }
+
+      function createCenterButtonControl() {
+        const centerButtonControl = L.Control.extend({
+          options: {
+            position: "topright",
+          },
+
+          onAdd: function (map) {
+            const button = L.DomUtil.create("button", "center-button");
+            button.innerHTML = "🏠"; // Change button text to the home icon
+
+            L.DomEvent.addListener(button, "click", centerOnLatestMarker);
+
+            // Prevent click events on the button from propagating to the map
+            L.DomEvent.disableClickPropagation(button);
+
+            return button;
+          },
+        });
+
+        return new centerButtonControl();
+      }
+
+      function updateMap() {
+        // Replace this URL with your own server endpoint
+        return fetch("/get_latest_location/")
+          .then((response) => response.json())
+          .then((location) => {
+            if (window.circleMarker) {
+              window.circleMarker.remove();
+            }
+
+            const circleMarker = L.circleMarker(
+              [location.latitude, location.longitude],
+              {
+                color: "red",
+                fillColor: "#f03",
+                fillOpacity: 0.5,
+                radius: 10,
+              }
+            ).addTo(window.map);
+            circleMarker.bindPopup(
+              `Humidity: ${location.humidity}<br>` +
+                `Temperature: ${location.temperature}<br>` +
+                `Dissolved Oxygen: ${location.dissolvedOxygen}<br>` +
+                `Air Pressure: ${location.airPressure}<br>` +
+                `Timestamp: ${location.created_at}`
+            );
+            window.circleMarker = circleMarker;
+          })
+          .catch((error) =>
+            console.error("Error fetching location data:", error)
+          );
+      }
+
+      // // Fetch points from the server-side API
+      // function fetchPoints() {
+      //   $.ajax({
+      //     url: "/api/get_points/",
+      //     type: "GET",
+      //     dataType: "json",
+      //     success: function (data) {
+      //       // Iterate through the list of points
+      //       data.forEach(function (point) {
+      //         // Create a marker for each point
+      //         const marker = L.marker([point.latitude, point.longitude]).addTo(
+      //           map
+      //         );
+
+      //         // Optional: Add a popup with information about the point
+      //         marker.bindPopup(
+      //           `<b>Zone:</b> ${point.zone}<br><b>Latitude:</b> ${point.latitude}<br><b>Longitude:</b> ${point.longitude}`
+      //         );
+
+      //         // Add the point data to the table
+      //         $("#table-body").append(
+      //           `<tr>
+      //                   <td>${point.zone}</td>
+      //                   <td>${point.latitude}</td>
+      //                   <td>${point.longitude}</td>
+      //               </tr>`
+      //         );
+      //       });
+      //     },
+      //     error: function (error) {
+      //       console.error("Error fetching points:", error);
+      //     },
+      //   });
+      // }
+
+      // $(document).ready(function () {
+      //   fetchPoints();
+      // });
+
+      // async function fetchPoints() {
+      //   try {
+      //     const response = await fetch("/api/get_points/"); // Call the get_points API
+      //     const points = await response.json();
+
+      //     console.log("Fetched points:", points); // Log the fetched points
+
+      //     points.forEach((point) => {
+      //       // Add a marker for each point
+      //       const marker = L.marker([point.latitude, point.longitude]).addTo(
+      //         map
+      //       );
+      //       // Add any additional logic for the markers, such as popups or event listeners, if needed
+      //     });
+      //   } catch (error) {
+      //     console.error("Error fetching points:", error);
+      //   }
+      // }
+
+      // Call the initMap() function when the page loads
+      $(document).ready(initMap);
+
+      $(document).ready(async function () {
+        await initMap();
+        // await fetchPoints(); // Add this line to fetch points on page load or reload
+      });
+
+      async function initMap() {
+        window.map = L.map("map").setView([0, 0], 2);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(window.map);
+
+        // // Fetch points from the database and display them on the map
+        // await fetchPoints();
+
+        window.map.addControl(createCenterButtonControl());
+
+        await updateMap();
+        centerOnLatestMarker();
+      }
+
+      initMap();
+      setInterval(updateMap, 5000);
+
+      // Function to check if a marker already exists at the given coordinates
+      function markerExists(lat, lng) {
+        return Array.from(markers.values()).some((marker) => {
+          return (
+            marker.getLatLng().lat === lat && marker.getLatLng().lng === lng
+          );
+        });
+      }
+
+      function addMarkerAndRow(e) {
+        // Get the latitude and longitude from the event
+        const { lat, lng } = e.latlng;
+
+        // Check if a marker already exists at the given coordinates
+        if (markerExists(lat, lng)) {
+          alert("You cannot add multiple markers at the same location.");
+          return;
+        }
+
+        const rowId = `R${rowIdx + 1}`;
+        var marker = L.marker([lat, lng]).addTo(window.map);
+        markers.set(rowId, marker);
+
+        $("#tbody").append(`<tr id="${rowId}">
+          <td class="row-index text-center">
+          <p>${rowIdx + 1}</p>
+          </td>
+          <td>
+          <input type="float" class="text-center container-fluid" id="latitude_${
+            rowIdx + 1
+          }" value="${lat.toFixed(6)}" name="latitude-${rowIdx + 1}">
+          </td>
+          <td>
+          <input type="float" class="text-center container-fluid" id="longitude_${
+            rowIdx + 1
+          }" value="${lng.toFixed(6)}" name="Longitude-${rowIdx + 1}">
+          </td>
+          <td class="text-center">
+            <button class="btn btn-danger remove" type="button" data-row-id="${rowId}">Remove</button>
+          </td>
+          </tr>`);
+
+        rowIdx++;
+      }
+
+      // Click event to add a marker and a new row with the marker's coordinates
+      map.on("click", addMarkerAndRow);
+
+      // jQuery button click event to remove a row and the corresponding marker.
+      $("#tbody").on("click", ".remove", function () {
+        // Get the row ID
+        const rowId = $(this).attr("data-row-id");
+
+        // Remove the marker from the map
+        const marker = markers.get(rowId);
+        map.removeLayer(marker);
+        markers.delete(rowId);
+
+        // Removing the current row.
+        $(this).closest("tr").remove();
+
+        // Decreasing total number of rows by 1.
+        rowIdx--;
+
+        // Update row numbers and IDs
+        $("#tbody tr").each(function (index) {
+          $(this).attr("id", `R${index + 1}`);
+          $(this)
+            .find(".row-index p")
+            .text(index + 1);
+        });
+      });
+      // Submit button click event
+      $("#submitBtn").on("click", function () {
+        // Disable the button click event and change its color
+        $("#submitBtn")
+          .prop("disabled", true)
+          .removeClass("btn-primary btn-danger")
+          .addClass("btn-success");
+
+        // Extract the data from the table
+        const data = [];
+        $("#tbody tr").each(function () {
+          const row = $(this);
+          const zone = row.find(".row-index p").text();
+          const latitude = row.find("input[name^='latitude-']").val();
+          const longitude = row.find("input[name^='Longitude-']").val();
+          data.push({ zone, latitude, longitude });
+        });
+
+        // Make an AJAX request to send the data to the server
+        $.ajax({
+          url: window.location.href, // Use the current URL
+          method: "POST",
+          data: JSON.stringify(data),
+          contentType: "application/json",
+          headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+          },
+          success: function (response) {
+            if (response.status === "success") {
+              alert("Data submitted successfully!");
+            } else {
+              alert("Error submitting data.");
+              // Restore the button color to red
+              $("#submitBtn")
+                .removeClass("btn-primary btn-success")
+                .addClass("btn-danger");
+            }
+          },
+          error: function () {
+            alert("Error submitting data.");
+
+            // Restore the button color to red
+            $("#submitBtn")
+              .removeClass("btn-primary btn-success")
+              .addClass("btn-danger");
+          },
+
+          complete: function () {
+            // Restore the button color to blue and re-enable the button click event after the AJAX request is complete
+            setTimeout(function () {
+              $("#submitBtn")
+                .prop("disabled", false)
+                .removeClass("btn-success btn-danger")
+                .addClass("btn-primary");
+            }, 3000); // Change the color back to blue after 3 seconds
+          },
+        });
+      });
+
+      // Click event for the "remove" buttons to restore the button color to blue and re-enable the button click event
+      $("#tbody").on("click", ".remove", function () {
+        $("#submitBtn")
+          .prop("disabled", false)
+          .removeClass("btn-success btn-danger")
+          .addClass("btn-primary");
+      });
+
+      // Click event for the map to restore the button color to blue and re-enable the button click event
+      map.on("click", function () {
+        $("#submitBtn")
+          .prop("disabled", false)
+          .removeClass("btn-success btn-danger")
+          .addClass("btn-primary");
+      });
+    </script>
+  </div>
+</div>
+{% endblock %}
